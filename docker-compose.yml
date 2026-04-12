@@ -1,0 +1,33 @@
+# Devotional App — GHCR + Watchtower deploy pattern
+# Pulled from ghcr.io, auto-updated by Watchtower sidecar.
+# Environment variables are set in the Portainer stack UI or in a .env file.
+
+services:
+  devotional-app:
+    image: ghcr.io/jamisonhill/devotional-app:latest
+    container_name: devotional-app
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+      - DB_PATH=/app/data/devotionals.db
+    volumes:
+      - devotional-data:/app/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower-devotional:
+    image: containrrr/watchtower
+    container_name: watchtower-devotional
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --label-enable --cleanup --interval 300 --include-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+volumes:
+  devotional-data:
