@@ -68,7 +68,7 @@ export default function InputForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* Input Mode Tabs */}
       <div>
         <label className="block text-sm font-semibold mb-2" style={{ color: "#113E30" }}>
