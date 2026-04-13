@@ -1,8 +1,20 @@
+// pdfjs-dist (used by pdf-parse) requires browser canvas APIs at module load.
+// Stub them before any imports since Next.js serverExternalPackages triggers
+// module evaluation at route initialization time. Only text extraction is needed.
+const g = globalThis as Record<string, unknown>;
+if (!g.DOMMatrix) {
+  g.DOMMatrix = class DOMMatrix { constructor() {} } as unknown as typeof globalThis.DOMMatrix;
+}
+if (!g.Path2D) {
+  g.Path2D = class Path2D { constructor() {} } as unknown as typeof globalThis.Path2D;
+}
+if (!g.ImageData) {
+  g.ImageData = class ImageData { constructor() {} } as unknown as typeof globalThis.ImageData;
+}
+
 import * as cheerio from "cheerio";
 import mammoth from "mammoth";
-// pdf-parse is loaded dynamically in extractFromPdf() because its dependency
-// pdfjs-dist tries to use browser-only APIs (DOMMatrix, Path2D) at module load
-// time, which crashes the Node.js server if imported statically.
+import { PDFParse } from "pdf-parse";
 
 // Extract text from a URL by fetching and parsing the HTML
 export async function extractFromUrl(url: string): Promise<string> {
@@ -83,9 +95,7 @@ export async function extractFromFile(
 }
 
 // Extract text from a PDF buffer using pdf-parse v2 class-based API
-// Dynamically imported to avoid pdfjs-dist crashing on missing DOMMatrix in Node.js
 async function extractFromPdf(buffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const result = await parser.getText();
   await parser.destroy();
