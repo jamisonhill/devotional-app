@@ -207,6 +207,7 @@ export default function InputForm() {
       {/* Submit button */}
       <button
         type="submit"
+        formNoValidate
         disabled={loading}
         className="w-full rounded-lg px-6 py-3.5 text-white font-semibold text-sm transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ backgroundColor: "#a6192e" }}
