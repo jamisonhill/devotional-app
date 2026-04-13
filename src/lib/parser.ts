@@ -1,6 +1,8 @@
 import * as cheerio from "cheerio";
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+// pdf-parse is loaded dynamically in extractFromPdf() because its dependency
+// pdfjs-dist tries to use browser-only APIs (DOMMatrix, Path2D) at module load
+// time, which crashes the Node.js server if imported statically.
 
 // Extract text from a URL by fetching and parsing the HTML
 export async function extractFromUrl(url: string): Promise<string> {
@@ -81,7 +83,9 @@ export async function extractFromFile(
 }
 
 // Extract text from a PDF buffer using pdf-parse v2 class-based API
+// Dynamically imported to avoid pdfjs-dist crashing on missing DOMMatrix in Node.js
 async function extractFromPdf(buffer: Buffer): Promise<string> {
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const result = await parser.getText();
   await parser.destroy();
