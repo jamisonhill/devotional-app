@@ -16,20 +16,41 @@
 - [x] Create GitHub repo (jamisonhill/devotional-app, private)
 - [x] Push to main, GitHub Actions build succeeded
 - [x] Add GHCR registry to Portainer
-- [x] Make GHCR package public
+- [x] Make GHCR package public (required for Watchtower pulls)
 - [x] Deploy Portainer stack (port 3100)
 - [x] Verify app loads on NAS
 
-## Phase 3: Bug Fixes & Polish [IN PROGRESS]
-- [x] Fix: disable browser form validation (noValidate) — pushed, awaiting Watchtower
-- [ ] Test full generation flow on NAS ← PAUSED HERE
-- [ ] Set up Cloudflare Turnstile (site key + secret key)
-- [ ] Test URL input mode
-- [ ] Test file upload mode
-- [ ] Test PDF download
-- [ ] Test RSS feed
+## Phase 3: Bug Fixes & Production Stability [COMPLETE]
+- [x] Fix: disable browser form validation (noValidate, formNoValidate)
+- [x] Fix: improve error handling to surface actual server errors
+- [x] Fix: add missing server packages to standalone build
+- [x] Fix: DOMMatrix crash — pdf-parse/pdfjs-dist uses browser-only APIs at module load
+  - Added `instrumentation.ts` to polyfill DOMMatrix/Path2D/ImageData before route modules load
+- [x] Fix: DNS resolution failure in Docker container (EAI_AGAIN api.anthropic.com)
+  - Container restarted with `--dns 1.1.1.1 --dns 8.8.8.8` for reliable DNS
+- [x] Fix: Watchtower couldn't pull from GHCR (package was private, no docker login)
+  - Made GHCR package public
+- [x] Test full generation flow on NAS — working end-to-end (paste text mode)
 
-## Phase 4: Email Delivery (Future)
+## Phase 4: Input Validation & Security [NOT STARTED]
+- [ ] Validate input is actually sermon/devotional content before sending to Claude
+  - Reject off-topic, harmful, or nonsensical input
+  - Catch prompt injection attempts (users trying to override the system prompt)
+- [ ] Add content-type heuristics (minimum word count, religious/theological keyword check)
+- [ ] Add Claude-based pre-screening pass (lightweight check: "is this sermon content?")
+- [ ] Rate limiting per IP to prevent abuse
+- [ ] Set up Cloudflare Turnstile (site key + secret key) for bot protection
+- [ ] Add input length limits with clear user feedback
+
+## Phase 5: Testing & Polish [NOT STARTED]
+- [ ] Test URL input mode (try real sermon URLs from desiringgod.org, etc.)
+- [ ] Test file upload mode (PDF, Word, TXT)
+- [ ] Test PDF download button
+- [ ] Test RSS feed (copy link, open in browser or reader)
+- [ ] Mobile responsiveness check
+- [ ] Error messaging improvements
+
+## Phase 6: Email Delivery (Future)
 - [ ] Choose email provider (Resend or SendGrid)
 - [ ] Add email collection on devotional page
 - [ ] Build scheduled email sender (one day per email per day)

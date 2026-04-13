@@ -1,49 +1,62 @@
 # Resume: Devotional App
 
-**Paused:** 2026-04-12 2:30am
-**Reason:** Done for tonight, more testing tomorrow
-**Phase:** 3/4 — Bug Fixes & Polish
-**Task:** Test full generation flow on NAS
+**Paused:** 2026-04-13 ~12:30am
+**Reason:** Phase 3 complete — app is working in production. Next phase is input validation.
+**Phase:** 3 complete, Phase 4 next — Input Validation & Security
+**Task:** Design and implement content validation for the input form
 
 ## What's Working
-- App is deployed and loading on NAS at http://192.168.0.9:3100
-- Paste text mode works locally (tested with sermon text, generated devotional successfully)
-- GitHub Actions CI/CD pipeline working (GHCR + Watchtower auto-deploy)
-- Portainer stack deployed with env vars (ANTHROPIC_API_KEY set, Turnstile keys blank)
+- Full generation flow works end-to-end at https://devotional.duski.org
+- Paste text mode confirmed working in production
+- GitHub Actions CI/CD → GHCR → Watchtower auto-deploy pipeline functional
+- GHCR package is public (Watchtower can pull without auth)
+- Container running with explicit DNS (--dns 1.1.1.1 --dns 8.8.8.8)
+- Cloudflare tunnel routing traffic to NAS port 3100
 
-## What Was Just Fixed
-- Browser form validation error ("The string did not match the expected pattern") when submitting on Paste Text tab
-- Fix: added `noValidate` to form element — committed and pushed, Watchtower should pick up within ~5 min
-- Also fixed earlier: ANTHROPIC_API_KEY not loading (was missing `ANTHROPIC_API_KEY=` prefix in .env.local, plus lazy-init client)
+## What Was Fixed This Session
+1. **DOMMatrix crash** — `pdf-parse` → `pdfjs-dist` uses browser-only APIs (DOMMatrix, Path2D, ImageData) at module evaluation time. Fixed with `instrumentation.ts` that polyfills these before any route modules load.
+2. **DNS resolution failure** — Container couldn't resolve `api.anthropic.com` (EAI_AGAIN). Fixed by adding `--dns 1.1.1.1 --dns 8.8.8.8` to docker run.
+3. **Watchtower pull failure** — GHCR package was private with no docker login on NAS. Fixed by making package public.
+4. **SSH access** — NAS SSH was down, required reboot. Now working on port 22.
 
 ## Key Decisions Made
-- Using GHCR + Watchtower deploy pattern (not the static-site skill directly, but same pattern adapted for dynamic Next.js app)
-- PDF "download" serves styled HTML that user prints to PDF from browser (avoids puppeteer dependency in container)
-- Turnstile bypassed for now (no keys configured) — needs setup in Cloudflare dashboard
-- Port 3100 on NAS
-- SQLite stored in Docker named volume `devotional-data`
+- GHCR package set to public (no secrets in image, source stays private)
+- `instrumentation.ts` pattern for server-side polyfills (runs before route module evaluation)
+- Container managed via `docker run` with explicit flags (not Portainer stack compose, since compose file lives inside Portainer's volume)
+- Cloudflare tunnel has 100s timeout — generation must complete within that window
+
+## Known Limitations
+- **No input validation** — form accepts any text, no check that it's actually sermon content. Vulnerable to prompt injection and abuse.
+- **Turnstile not configured** — bypass mode active (no site key or secret key set)
+- **Cloudflare 524 timeout** — long generations (7-day, verbose sermons) may exceed Cloudflare's 100s timeout
+- **No rate limiting** — any user can generate unlimited devotionals
 
 ## Code State
-- All source in `/Users/jamisonhill/Ai/Devotions/devotional-app/`
-- GitHub: `jamisonhill/devotional-app` (private)
-- Latest commit: `fix: disable browser form validation to prevent URL field error`
+- All source: `/Users/jamisonhill/Ai/Devotions/devotional-app/`
+- GitHub: `jamisonhill/devotional-app` (private repo, public GHCR package)
+- Latest commit: `fix: use instrumentation.ts to polyfill DOMMatrix before module load`
 - No uncommitted changes
+- Branch: `main`
 
-## What to Test Next
-1. Generate a devotional on the NAS (paste text mode) — verify the noValidate fix deployed
-2. Test URL input mode (try a sermon URL)
-3. Test file upload mode (PDF, Word, TXT)
-4. Test the devotional viewer (day navigation, styling)
-5. Test PDF download button
-6. Test RSS feed (copy link, open in browser or reader)
-7. Set up Cloudflare Turnstile keys
+## What to Do Next (Phase 4: Input Validation & Security)
+1. **Content validation** — before sending to Claude, verify input is sermon-like content:
+   - Minimum word count check (~100 words)
+   - Lightweight Claude pre-screen: "Is this a sermon, Bible study, or religious teaching?"
+   - Reject clearly off-topic content with helpful error message
+2. **Prompt injection protection** — sanitize input to prevent system prompt override:
+   - Strip common injection patterns ("ignore previous instructions", "you are now...")
+   - Add guardrails in the system prompt to resist manipulation
+3. **Rate limiting** — per-IP throttle to prevent abuse
+4. **Turnstile setup** — configure Cloudflare Turnstile site key + secret key
 
-## NAS Connection Note
-- SSH to nas-home was refused during this session (port 22 connection refused)
-- All NAS work done through Portainer web UI at portainer.duski.org
+## NAS Connection
+- SSH: `ssh nas-home` (192.168.0.9:22, key auth)
+- Docker commands require: `echo '$NAS_SUDO_PW' | sudo -S -p "" ...`
+- Container: `devotional-app` on port 3100→3000
+- Portainer: port 9000
 
 ## To Resume
-1. Open http://192.168.0.9:3100 and test generation
-2. If issues, check Portainer container logs
-3. For local dev: `cd /Users/jamisonhill/Ai/Devotions/devotional-app && npm run dev`
-4. Need `.env.local` with `ANTHROPIC_API_KEY=sk-ant-...` for local dev
+1. `cd /Users/jamisonhill/Ai/Devotions/devotional-app`
+2. Read `.planning/PROGRESS.md` and `.planning/RESUME.md`
+3. Start Phase 4 — input validation work
+4. For local dev: `npm run dev` (needs `.env.local` with ANTHROPIC_API_KEY)
