@@ -4,6 +4,7 @@ import { verifyTurnstile } from "../../../lib/turnstile";
 import { extractFromUrl, extractFromFile } from "../../../lib/parser";
 import { generateDevotional } from "../../../lib/claude";
 import { saveDevotional } from "../../../lib/db";
+import { validateSermonText } from "../../../lib/validation";
 import type { VoiceStyle, InputMode } from "../../../lib/types";
 
 export async function POST(request: NextRequest) {
@@ -30,8 +31,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Bot verification failed. Please try again." }, { status: 403 });
     }
 
-    // Extract sermon text based on input mode
+    // Extract sermon text based on input mode. Each branch produces `sermonText`
+    // and a `sourceLabel` that the validator uses to tailor error messages.
     let sermonText: string;
+    let sourceLabel: "paste" | "url" | "upload";
 
     if (inputMode === "url") {
       const url = formData.get("url") as string;
@@ -39,15 +42,11 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: "Please provide a URL" }, { status: 400 });
       }
       sermonText = await extractFromUrl(url);
+      sourceLabel = "url";
     } else if (inputMode === "paste") {
       const text = formData.get("text") as string;
-      if (!text || text.trim().length < 100) {
-        return Response.json(
-          { error: "Please paste at least 100 characters of sermon text" },
-          { status: 400 }
-        );
-      }
-      sermonText = text.trim();
+      sermonText = (text || "").trim();
+      sourceLabel = "paste";
     } else if (inputMode === "upload") {
       const file = formData.get("file") as File | null;
       if (!file) {
@@ -55,21 +54,16 @@ export async function POST(request: NextRequest) {
       }
       const buffer = Buffer.from(await file.arrayBuffer());
       sermonText = await extractFromFile(buffer, file.name);
+      sourceLabel = "upload";
     } else {
       return Response.json({ error: "Invalid input mode" }, { status: 400 });
     }
 
-    // Truncate very long texts to avoid token limits
-    // ~100k characters is roughly 25k tokens — plenty of context
-    if (sermonText.length > 100000) {
-      sermonText = sermonText.slice(0, 100000);
-    }
-
-    if (sermonText.length < 50) {
-      return Response.json(
-        { error: "Could not extract enough text from the source. Please try a different input method." },
-        { status: 400 }
-      );
+    // Uniform word-count validation for all three input modes. See
+    // src/lib/validation.ts for the MIN_WORDS / MAX_WORDS limits.
+    const validation = validateSermonText(sermonText, sourceLabel);
+    if (!validation.ok) {
+      return Response.json({ error: validation.error }, { status: 400 });
     }
 
     // Generate the devotional via Claude
