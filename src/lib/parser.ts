@@ -1,17 +1,3 @@
-// pdfjs-dist (used by pdf-parse) requires browser canvas APIs at module load.
-// Stub them before any imports since Next.js serverExternalPackages triggers
-// module evaluation at route initialization time. Only text extraction is needed.
-const g = globalThis as Record<string, unknown>;
-if (!g.DOMMatrix) {
-  g.DOMMatrix = class DOMMatrix { constructor() {} } as unknown as typeof globalThis.DOMMatrix;
-}
-if (!g.Path2D) {
-  g.Path2D = class Path2D { constructor() {} } as unknown as typeof globalThis.Path2D;
-}
-if (!g.ImageData) {
-  g.ImageData = class ImageData { constructor() {} } as unknown as typeof globalThis.ImageData;
-}
-
 import * as cheerio from "cheerio";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
