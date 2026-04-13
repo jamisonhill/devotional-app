@@ -54,14 +54,23 @@ export default function InputForm() {
         body: formData,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Generation failed");
+      // Read response body as text first, then try to parse as JSON
+      const responseText = await response.text();
+      let data: { id?: string; error?: string };
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        // Server returned non-JSON (e.g. HTML error page)
+        throw new Error(`Server error (${response.status}): ${responseText.slice(0, 200)}`);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Generation failed (${response.status})`);
+      }
+
       router.push(`/devotional/${data.id}`);
     } catch (err) {
+      console.error("Submit error:", err);
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }
@@ -97,7 +106,7 @@ export default function InputForm() {
       <div>
         {inputMode === "url" && (
           <input
-            type="url"
+            type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://www.desiringgod.org/messages/..."
