@@ -5,6 +5,7 @@ import { extractFromUrl, extractFromFile } from "../../../lib/parser";
 import { generateDevotional, ContentRejectedError } from "../../../lib/claude";
 import { saveDevotional } from "../../../lib/db";
 import { validateSermonText } from "../../../lib/validation";
+import { checkAndRecord, getClientIp } from "../../../lib/rate-limit";
 import type { VoiceStyle, InputMode } from "../../../lib/types";
 
 export async function POST(request: NextRequest) {
@@ -23,6 +24,24 @@ export async function POST(request: NextRequest) {
 
     if (![3, 5, 7].includes(dayCount)) {
       return Response.json({ error: "Day count must be 3, 5, or 7" }, { status: 400 });
+    }
+
+    // Per-IP rate limit. Runs before Turnstile so abusive IPs don't burn
+    // Cloudflare siteverify calls. Consumes a slot on every request that
+    // gets past basic input validation — typos eat quota, which is fine
+    // at 10/day.
+    const ip = getClientIp(request);
+    const rl = checkAndRecord(ip);
+    if (!rl.allowed) {
+      return Response.json(
+        {
+          error: `Rate limit exceeded (${rl.limit}/day). Try again in about ${formatRetry(rl.retryAfterSeconds)}.`,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rl.retryAfterSeconds) },
+        }
+      );
     }
 
     // Verify Turnstile token (bot protection)
@@ -91,4 +110,13 @@ export async function POST(request: NextRequest) {
     const message = err instanceof Error ? err.message : "Internal server error";
     return Response.json({ error: message }, { status: 500 });
   }
+}
+
+// Humanize retry-after seconds for the error message shown to the user.
+function formatRetry(seconds: number): string {
+  if (seconds < 60) return `${seconds} seconds`;
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
 }
