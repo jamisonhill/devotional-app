@@ -2,22 +2,87 @@ import * as cheerio from "cheerio";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 
-// Extract text from a URL by fetching and parsing the HTML
-export async function extractFromUrl(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      // Use a browser-like user agent to avoid 403s from some sites
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    },
-  });
+// Thrown for any user-fixable problem fetching or decoding a URL. The route
+// handler maps this to a 400 with the message shown directly to the user,
+// so keep messages actionable ("try pasting text instead", etc.).
+export class UrlFetchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UrlFetchError";
+  }
+}
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+// Fetch cap for URL extraction. Cloudflare's tunnel timeout is 100s and the
+// Claude call eats ~15-60s of that, so we can't afford a slow origin.
+const URL_FETCH_TIMEOUT_MS = 30_000;
+
+// Extract text from a URL. Branches on Content-Type so a PDF URL is parsed
+// as a PDF instead of being fed to cheerio (which would happily return
+// binary garbage as "text" and Claude would reject it later).
+export async function extractFromUrl(url: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        // Browser-like UA — some sermon sites 403 unknown agents.
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(URL_FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    // AbortError fires when the timeout trips; any other exception is
+    // a network-level failure (DNS, connection refused, TLS, etc.).
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new UrlFetchError(
+        `That URL took longer than ${URL_FETCH_TIMEOUT_MS / 1000}s to respond. Try a different URL or paste the sermon text directly.`
+      );
+    }
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new UrlFetchError(
+      `Could not reach that URL (${reason}). Check the URL or paste the sermon text directly.`
+    );
   }
 
-  const html = await response.text();
-  return extractTextFromHtml(html);
+  if (!response.ok) {
+    if (response.status === 403 || response.status === 401) {
+      throw new UrlFetchError(
+        `That site blocked our request (HTTP ${response.status}). Paste the sermon text directly instead.`
+      );
+    }
+    if (response.status === 404) {
+      throw new UrlFetchError(
+        "That URL returned 404 (not found). Double-check the link."
+      );
+    }
+    throw new UrlFetchError(
+      `That URL returned HTTP ${response.status}. Try a different URL or paste the sermon text directly.`
+    );
+  }
+
+  // Route by Content-Type so PDF URLs go to the PDF extractor, not cheerio.
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+  if (contentType.includes("application/pdf")) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return extractFromPdf(buffer);
+  }
+
+  if (
+    contentType.includes("text/html") ||
+    contentType.includes("application/xhtml") ||
+    contentType.includes("text/plain") ||
+    contentType === ""
+  ) {
+    const text = await response.text();
+    return contentType.includes("text/plain")
+      ? cleanText(text)
+      : extractTextFromHtml(text);
+  }
+
+  throw new UrlFetchError(
+    `Unsupported content type at that URL (${contentType}). Paste the sermon text directly instead.`
+  );
 }
 
 // Extract readable text from HTML, stripping nav/footer/scripts

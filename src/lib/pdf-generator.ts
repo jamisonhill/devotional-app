@@ -152,6 +152,16 @@ export function generateDevotionalHtml(devotional: Devotional): string {
   <p class="subtitle">A ${devotional.dayCount}-Day Devotional in the Voice of ${escapeHtml(voiceLabel)}</p>
 
   ${daysHtml}
+
+  <script>
+    // Open the print dialog as soon as fonts are ready so the user lands
+    // on "Save as PDF" without having to hunt for File → Print.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => window.print());
+    } else {
+      window.addEventListener('load', () => window.print());
+    }
+  </script>
 </body>
 </html>`;
 }

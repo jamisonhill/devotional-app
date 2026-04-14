@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { verifyTurnstile } from "../../../lib/turnstile";
-import { extractFromUrl, extractFromFile } from "../../../lib/parser";
+import { extractFromUrl, extractFromFile, UrlFetchError } from "../../../lib/parser";
 import {
   generateDevotional,
   screenSermonContent,
@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ id: devotional.id });
   } catch (err) {
-    // Content rejection is a user-facing 400, not a server error.
-    if (err instanceof ContentRejectedError) {
+    // User-fixable errors map to 400 with the message shown directly.
+    if (err instanceof UrlFetchError || err instanceof ContentRejectedError) {
       return Response.json({ error: err.message }, { status: 400 });
     }
     console.error("Generation error:", err);
