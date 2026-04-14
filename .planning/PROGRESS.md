@@ -24,31 +24,32 @@
 - [x] Fix: disable browser form validation (noValidate, formNoValidate)
 - [x] Fix: improve error handling to surface actual server errors
 - [x] Fix: add missing server packages to standalone build
-- [x] Fix: DOMMatrix crash — pdf-parse/pdfjs-dist uses browser-only APIs at module load
-  - Added `instrumentation.ts` to polyfill DOMMatrix/Path2D/ImageData before route modules load
-- [x] Fix: DNS resolution failure in Docker container (EAI_AGAIN api.anthropic.com)
-  - Container restarted with `--dns 1.1.1.1 --dns 8.8.8.8` for reliable DNS
-- [x] Fix: Watchtower couldn't pull from GHCR (package was private, no docker login)
-  - Made GHCR package public
-- [x] Test full generation flow on NAS — working end-to-end (paste text mode)
+- [x] Fix: DOMMatrix crash via instrumentation.ts polyfill
+- [x] Fix: DNS resolution failure in Docker container (--dns 1.1.1.1 --dns 8.8.8.8)
+- [x] Fix: Watchtower GHCR pull (made package public)
+- [x] Test paste-text flow on NAS end-to-end
 
-## Phase 4: Input Validation & Security [NOT STARTED]
-- [ ] Validate input is actually sermon/devotional content before sending to Claude
-  - Reject off-topic, harmful, or nonsensical input
-  - Catch prompt injection attempts (users trying to override the system prompt)
-- [ ] Add content-type heuristics (minimum word count, religious/theological keyword check)
-- [ ] Add Claude-based pre-screening pass (lightweight check: "is this sermon content?")
-- [ ] Rate limiting per IP to prevent abuse
-- [ ] Set up Cloudflare Turnstile (site key + secret key) for bot protection
-- [ ] Add input length limits with clear user feedback
+## Phase 4: Input Validation & Security [COMPLETE]
+- [x] Word-count validation on all 3 input modes (min 100, max 30k) — 81dc5c9
+- [x] Prompt injection hardening (<sermon_manuscript> wrapper + guardrails) — 204d5f0
+- [x] Per-IP rate limiting (SQLite-backed, 10/day default, 429 w/ Retry-After) — d1e8fdd
+- [x] Haiku 4.5 pre-screen to reject non-sermon content — 456d7cc
+- [x] Turnstile production setup doc (docs/turnstile-setup.md) — 82d0c5e
+- [ ] (Deferred) Actually configure Turnstile site/secret keys in Cloudflare + NAS env
 
-## Phase 5: Testing & Polish [NOT STARTED]
-- [ ] Test URL input mode (try real sermon URLs from desiringgod.org, etc.)
-- [ ] Test file upload mode (PDF, Word, TXT)
-- [ ] Test PDF download button
-- [ ] Test RSS feed (copy link, open in browser or reader)
-- [ ] Mobile responsiveness check
-- [ ] Error messaging improvements
+## Phase 5: Testing & Polish [IN PROGRESS]
+- [x] Code review pass — cataloged 8 findings
+- [x] Bundle fix deployed: URL content-type check, friendlier errors, 30s
+      timeout, auto-print on PDF endpoint, RSS #day-N hash nav, RSS escaping — e3d31b4
+- [x] Fix: pdfjs-dist worker missing from standalone build — 1e82c61 ← DEPLOYED, needs verification
+- [ ] Verify paste-text flow still works (regression check after Phase 4/5 changes)
+- [ ] Verify upload mode works (PDF + Word + TXT) ← PAUSED HERE: needs 1e82c61 verification
+- [ ] Verify URL input mode ← BLOCKED: "fetch failed" on all URLs, need NAS logs to diagnose
+- [ ] Verify PDF download button (auto-print dialog)
+- [ ] Verify RSS feed + #day-N hash navigation
+- [ ] Mobile responsiveness check (real device)
+- [ ] (Deferred, optional) Per-devotional generateMetadata for social previews
+- [ ] (Deferred, optional) Cache-Control on PDF download endpoint
 
 ## Phase 6: Email Delivery (Future)
 - [ ] Choose email provider (Resend or SendGrid)
@@ -56,4 +57,4 @@
 - [ ] Build scheduled email sender (one day per email per day)
 
 ## Static Devotional Files (Pre-App)
-- [x] 7 hand-crafted devotionals from "The Sifting of Simon Peter" (day-1.md through day-7.md)
+- [x] 7 hand-crafted devotionals from "The Sifting of Simon Peter"
