@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { verifyTurnstile } from "../../../lib/turnstile";
 import { extractFromUrl, extractFromFile } from "../../../lib/parser";
-import { generateDevotional } from "../../../lib/claude";
+import { generateDevotional, ContentRejectedError } from "../../../lib/claude";
 import { saveDevotional } from "../../../lib/db";
 import { validateSermonText } from "../../../lib/validation";
 import type { VoiceStyle, InputMode } from "../../../lib/types";
@@ -83,6 +83,10 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ id: devotional.id });
   } catch (err) {
+    // Content rejection is a user-facing 400, not a server error.
+    if (err instanceof ContentRejectedError) {
+      return Response.json({ error: err.message }, { status: 400 });
+    }
     console.error("Generation error:", err);
     const message = err instanceof Error ? err.message : "Internal server error";
     return Response.json({ error: message }, { status: 500 });
