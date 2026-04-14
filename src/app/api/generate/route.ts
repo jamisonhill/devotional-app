@@ -2,7 +2,11 @@ import { NextRequest } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { verifyTurnstile } from "../../../lib/turnstile";
 import { extractFromUrl, extractFromFile } from "../../../lib/parser";
-import { generateDevotional, ContentRejectedError } from "../../../lib/claude";
+import {
+  generateDevotional,
+  screenSermonContent,
+  ContentRejectedError,
+} from "../../../lib/claude";
 import { saveDevotional } from "../../../lib/db";
 import { validateSermonText } from "../../../lib/validation";
 import { checkAndRecord, getClientIp } from "../../../lib/rate-limit";
@@ -83,6 +87,25 @@ export async function POST(request: NextRequest) {
     const validation = validateSermonText(sermonText, sourceLabel);
     if (!validation.ok) {
       return Response.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Cheap Haiku pre-screen: reject non-sermon content before firing the
+    // expensive Sonnet call. "unclear" is treated as allowed (benefit of
+    // the doubt) and any screener error also falls through — we don't
+    // want a Haiku hiccup to block a legitimate generation.
+    try {
+      const verdict = await screenSermonContent(sermonText);
+      if (verdict === "no") {
+        return Response.json(
+          {
+            error:
+              "The provided text does not appear to be a sermon, Bible teaching, or devotional content. Please provide sermon-style material.",
+          },
+          { status: 400 }
+        );
+      }
+    } catch (screenErr) {
+      console.warn("Pre-screen failed, allowing request through:", screenErr);
     }
 
     // Generate the devotional via Claude
