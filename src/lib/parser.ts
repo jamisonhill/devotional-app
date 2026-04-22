@@ -38,6 +38,12 @@ export async function extractFromUrl(url: string): Promise<string> {
         `That URL took longer than ${URL_FETCH_TIMEOUT_MS / 1000}s to respond. Try a different URL or paste the sermon text directly.`
       );
     }
+    // Node's fetch wraps the real network error in `err.cause` (e.g.
+    // ENOTFOUND, ECONNREFUSED, UND_ERR_SOCKET, TLS issues). Log it
+    // server-side so failures like the 2026-04-13 incident aren't
+    // reduced to the generic "fetch failed" string.
+    const cause = (err as Error & { cause?: unknown }).cause;
+    console.error("URL fetch failed:", url, "cause:", cause);
     const reason = err instanceof Error ? err.message : String(err);
     throw new UrlFetchError(
       `Could not reach that URL (${reason}). Check the URL or paste the sermon text directly.`

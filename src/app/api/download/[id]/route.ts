@@ -20,6 +20,9 @@ export async function GET(
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Disposition": `inline; filename="${devotional.sermonTitle.replace(/[^a-zA-Z0-9 ]/g, "")}-devotional.html"`,
+      // Devotionals are immutable by UUID — same policy as the RSS feed
+      // so repeat downloads / print-preview reloads don't rebuild HTML.
+      "Cache-Control": "public, max-age=3600",
     },
   });
 }

@@ -1,10 +1,31 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Montserrat } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
+
+// Self-hosted Montserrat via next/font — replaces the previous
+// <link rel="stylesheet"> to fonts.googleapis.com so we ship zero
+// font requests to Google at runtime and avoid the page-level perf
+// penalty Next's lint rule flagged.
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-montserrat",
+});
 
 export const metadata: Metadata = {
   title: "Sermon to Devotional",
   description:
     "Transform any sermon manuscript into a personal daily devotional series powered by AI.",
+};
+
+// iOS Safari and other mobile browsers render at a synthetic desktop width
+// (~980px) and scale down unless told otherwise, which makes text unreadable
+// on phones. Next 15+ no longer auto-injects this — has to be explicit.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -13,25 +34,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="min-h-full flex flex-col" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <html lang="en" className={`${montserrat.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col">
         <header className="border-b border-stone-200 bg-white">
           <div className="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
-            <a href="/" className="text-xl font-bold" style={{ color: "#113E30" }}>
+            <Link href="/" className="text-xl font-bold" style={{ color: "#113E30" }}>
               Sermon to Devotional
-            </a>
+            </Link>
             <span className="text-sm" style={{ color: "#777779" }}>
               AI-Powered Daily Devotionals
             </span>

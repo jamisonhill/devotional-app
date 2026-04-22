@@ -20,5 +20,6 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Montserrat', sans-serif;
+  /* --font-montserrat is set on <html> by next/font in layout.tsx. */
+  font-family: var(--font-montserrat), sans-serif;
 }
